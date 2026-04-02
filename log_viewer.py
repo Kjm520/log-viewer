@@ -30,7 +30,7 @@ LOG_SOURCES = [
         "label": "Scooper",
         "path": PATHS.SCOOPER_LOG_PATH,
         "label_style": "bold red",
-        "text_style": "red",
+        "text_style": "white",
     },
 ]
 
