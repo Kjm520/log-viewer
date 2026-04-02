@@ -30,7 +30,7 @@ LOG_SOURCES = [
     {
         "label": "K1 Financials",
         "path": PATHS.FINANCIALS_LOG_PATH,
-        "label_style": "bold yellow",
+        "label_style": "bold blue",
         "text_style": "white",
     },
     {
