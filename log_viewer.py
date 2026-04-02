@@ -3,6 +3,7 @@ RPA Log Viewer — tails multiple log files with color-coded output.
 Edit the CONFIG section below to change visuals or add/remove logs.
 """
 
+import re
 import time
 import os
 import sys
@@ -50,6 +51,17 @@ SHOW_TIMESTAMP = False
 TIMESTAMP_FORMAT = "%H:%M:%S"
 TIMESTAMP_STYLE = "dim green"
 
+# Pattern-based line highlighting — first match wins.
+# Each entry: (regex_pattern, rich_style)
+# If a log line matches the pattern, the entire line uses that style
+# instead of the source's default text_style.
+HIGHLIGHT_PATTERNS = [
+    (r"-{3,}.*Received message.*-{3,}", "bold bright_green"),
+    # (r"ERROR", "bold red"),
+    # (r"WARNING", "bold yellow"),
+]
+_COMPILED_PATTERNS = [(re.compile(p), s) for p, s in HIGHLIGHT_PATTERNS]
+
 # ╔══════════════════════════════════════════════════════════════════════╗
 # ║  LOGIC — you probably don't need to touch below here                 ║
 # ╚══════════════════════════════════════════════════════════════════════╝
@@ -72,7 +84,13 @@ def build_line(source: dict, line: str) -> Text:
 
     parts.append(padded, style=source["label_style"])
     parts.append(SEPARATOR, style=SEPARATOR_STYLE)
-    parts.append(line.rstrip("\n\r"), style=source["text_style"])
+    text = line.rstrip("\n\r")
+    style = source["text_style"]
+    for pattern, pat_style in _COMPILED_PATTERNS:
+        if pattern.search(text):
+            style = pat_style
+            break
+    parts.append(text, style=style)
     return parts
 
 
