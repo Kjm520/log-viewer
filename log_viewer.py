@@ -4,15 +4,22 @@ Edit the CONFIG section below to change visuals or add/remove logs.
 """
 
 import re
-import os
 import time
-from threading import Lock
+import os
+import sys
 from rich.console import Console
 from rich.text import Text
 from config.config import PATHS
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  CONFIG — edit this section to customize                           ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+# Each log source: (label, file_path, label_style, text_style)
+#   label        — tag shown before each line
+#   file_path    — absolute path to the log file
+#   label_style  — rich style string for the label  (colors, bold, etc.)
+#   text_style   — rich style string for the log text
 LOG_SOURCES = [
     {
         "label": "Email Bot",
@@ -33,6 +40,9 @@ LOG_SOURCES = [
         "text_style": "white",
     },
 ]
+
+# How often to poll for new lines (seconds)
+POLL_INTERVAL = 0.3
 
 # Separator between label and log text
 SEPARATOR = "│ "
@@ -58,9 +68,9 @@ HIGHLIGHT_PATTERNS = [
 ]
 _COMPILED_PATTERNS = [(re.compile(p), s) for p, s in HIGHLIGHT_PATTERNS]
 
-# ╔══════════════╗
-# ║  LOGIC       ║
-# ╚══════════════╝
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  LOGIC — you probably don't need to touch below here                 ║
+# ╚══════════════════════════════════════════════════════════════════════╝
 
 console = Console()
 
@@ -150,31 +160,6 @@ class LogTailer:
         return lines
 
 
-print_lock = Lock()
-
-
-class LogHandler(FileSystemEventHandler):
-    """Watches log file directories and prints new lines on change."""
-
-    def __init__(self, sources):
-        super().__init__()
-        self.tailers = {}
-        for src in sources:
-            path = os.path.abspath(src["path"])
-            self.tailers[path] = LogTailer(src)
-
-    def on_modified(self, event):
-        if event.is_directory:
-            return
-        path = os.path.abspath(event.src_path)
-        tailer = self.tailers.get(path)
-        if tailer is None:
-            return
-        for line in tailer.poll():
-            with print_lock:
-                console.print(line)
-
-
 def print_banner():
     console.print(BANNER, style=BANNER_STYLE)
     console.print("  RPA Log Viewer", style=BANNER_STYLE)
@@ -192,24 +177,17 @@ def print_banner():
 
 def main():
     print_banner()
-    handler = LogHandler(LOG_SOURCES)
-    observer = Observer()
+    tailers = [LogTailer(src) for src in LOG_SOURCES]
 
-    # Schedule the handler on each log file's parent directory
-    watched_dirs = set()
-    for src in LOG_SOURCES:
-        parent = os.path.dirname(os.path.abspath(src["path"]))
-        if parent not in watched_dirs:
-            observer.schedule(handler, parent, recursive=False)
-            watched_dirs.add(parent)
-
-    observer.start()
     try:
-        observer.join()
+        while True:
+            for tailer in tailers:
+                for line in tailer.poll():
+                    console.print(line)
+            time.sleep(POLL_INTERVAL)
     except KeyboardInterrupt:
-        observer.stop()
         console.print("\n[dim]Viewer stopped.[/dim]")
-    observer.join()
+        sys.exit(0)
 
 
 if __name__ == "__main__":
