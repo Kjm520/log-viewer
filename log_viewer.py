@@ -42,7 +42,7 @@ LOG_SOURCES = [
 ]
 
 # How often to poll for new lines (seconds)
-POLL_INTERVAL = 0.3
+POLL_INTERVAL = 0.5
 
 # Separator between label and log text
 SEPARATOR = "│ "
@@ -62,7 +62,8 @@ TIMESTAMP_STYLE = "dim green"
 # If a log line matches the pattern, the entire line uses that style
 # instead of the source's default text_style.
 HIGHLIGHT_PATTERNS = [
-    (r"-{3,}.*Received message.*-{3,}", "bold bright_green"),
+    (r"-{3,}.*Received message.*-{3,}", "bright_green"),
+    (r"Routing as DECLINE$", "bold red"),
     # (r"ERROR", "bold red"),
     # (r"WARNING", "bold yellow"),
 ]
