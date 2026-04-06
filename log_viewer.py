@@ -63,15 +63,15 @@ TIMESTAMP_STYLE = "dim green"
 # instead of the source's default text_style.
 HIGHLIGHT_PATTERNS = [
     (r"-{3,}.*Received message.*-{3,}", "bright_green"),
-    (r"Routing as DECLINE$", "bold red"),
+    (r"Routing as DECLINE", "bold red"),
     # (r"ERROR", "bold red"),
     # (r"WARNING", "bold yellow"),
 ]
 _COMPILED_PATTERNS = [(re.compile(p), s) for p, s in HIGHLIGHT_PATTERNS]
 
-# ╔══════════════════════════════════════════════════════════════════════╗
-# ║  LOGIC — you probably don't need to touch below here                 ║
-# ╚══════════════════════════════════════════════════════════════════════╝
+#
+# LOGIC
+#
 
 console = Console()
 
