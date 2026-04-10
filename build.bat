@@ -6,7 +6,7 @@ echo Killing running instances...
 taskkill /F /IM LogViewer.exe
 
 echo Building exe...
-pyinstaller --onefile --name LogViewer --console log_viewer.py
+pyinstaller LogViewer.spec
 
 echo Done! Exe is at dist\LogViewer.exe
 pause
