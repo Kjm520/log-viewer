@@ -21,7 +21,7 @@ LOG_SOURCES = [
     {
         "label": "Email Bot",
         "path": PATHS.EMAIL_BOT_LOG_PATH,
-        "label_color": "#00cccc",
+        "label_color": "#d9ead3",
         "text_color": "#cccccc",
     },
     {
