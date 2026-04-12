@@ -58,7 +58,7 @@ WINDOW_HEIGHT = 700
 BG_COLOR = "#1e1e1e"
 FONT_FAMILY = "Consolas"
 FONT_SIZE = 10
-MAX_LINES = 20
+MAX_LINES = 200
 
 # ╔══════════════════════════════════════════════════════════════════════╗
 # ║  LOGIC                                                               ║
