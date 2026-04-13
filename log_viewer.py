@@ -43,7 +43,7 @@ _COMPILED_PATTERNS = [(re.compile(p), c) for p, c in HIGHLIGHT_PATTERNS]
 WINDOW_TITLE = "Log Viewer"
 WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 760
-WINDOW_OPACITY = 0.8  # opacity used when transparency is toggled ON (Ctrl+T). Startup is always 1.0.
+WINDOW_OPACITY = 0.6  # opacity used when transparency is toggled ON (Ctrl+T). Startup is always 1.0.
 
 # Palette
 BG = "#1a1a1c"
