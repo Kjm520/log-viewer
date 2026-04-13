@@ -43,6 +43,7 @@ _COMPILED_PATTERNS = [(re.compile(p), c) for p, c in HIGHLIGHT_PATTERNS]
 WINDOW_TITLE = "Log Viewer"
 WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 760
+WINDOW_OPACITY = 0.8  # opacity used when transparency is toggled ON (Ctrl+T). Startup is always 1.0.
 
 # Palette
 BG = "#1a1a1c"
@@ -52,8 +53,8 @@ CARD_HOVER_BG = "#34343a"
 CARD_DISABLED_BG = "#1f1f22"
 STATUSBAR_BG = "#1d1d20"
 BORDER = "#35353a"
-MUTED = "#8a8a92"
-TEXT = "#d4d4d8"
+MUTED = "#888888"
+TEXT = "#e0e0e0"
 ACCENT = "#4f9fff"
 ACCENT_DIM = "#2a5a9a"
 
@@ -349,6 +350,7 @@ class LogViewerWindow(QMainWindow):
 
         self._auto_scroll = True
         self._paused = False
+        self._transparent = False
         self._filter_text = ""
         self._suppress_scroll_update = False
         self._max_label = max(len(s["label"]) for s in LOG_SOURCES)
@@ -389,6 +391,7 @@ class LogViewerWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+F"), self, activated=self._open_search)
         QShortcut(QKeySequence("Escape"), self, activated=self._close_search)
         QShortcut(QKeySequence("Ctrl+P"), self, activated=self._toggle_pause)
+        QShortcut(QKeySequence("Ctrl+T"), self, activated=self._toggle_opacity)
 
     # ── UI construction ────────────────────────────────────────────
 
@@ -400,22 +403,12 @@ class LogViewerWindow(QMainWindow):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # Top accent stripe
-        stripe = QFrame()
-        stripe.setFixedHeight(2)
-        stripe.setStyleSheet(f"background-color: {ACCENT};")
-        root.addWidget(stripe)
-
+        root.addWidget(self._make_divider())
         root.addWidget(self._build_header())
-
-        # Divider
-        div = QFrame()
-        div.setFixedHeight(1)
-        div.setStyleSheet(f"background-color: {BORDER};")
-        root.addWidget(div)
+        root.addWidget(self._make_divider())
 
         # Search bar (hidden by default)
-        self.search = SearchBar(icon_path=os.path.join(self._btn_icons, "search.png"))
+        self.search = SearchBar(icon_path=os.path.join(self._btn_icons, "search_888888.png"))
         self.search.changed.connect(self._on_filter_changed)
         self.search.closed.connect(self._close_search)
         root.addWidget(self.search)
@@ -473,6 +466,12 @@ class LogViewerWindow(QMainWindow):
 
         root.addWidget(self._build_statusbar())
 
+    def _make_divider(self) -> QWidget:
+        d = QWidget()
+        d.setFixedHeight(1)
+        d.setStyleSheet(f"background-color: {BORDER};")
+        return d
+
     def _mono_font(self) -> QFont:
         f = QFont(FONT_FAMILY, FONT_SIZE)
         if not f.exactMatch():
@@ -510,26 +509,35 @@ class LogViewerWindow(QMainWindow):
 
         lay.addSpacing(8)
 
+        self.opacity_btn = IconButton(
+            icon_path=os.path.join(self._btn_icons, "opacity_888888.png"),
+            hover_icon_path=os.path.join(self._btn_icons, "opacity_E0E0E0.png"),
+            tooltip="Toggle transparency (Ctrl+T)",
+        )
+        self.opacity_btn.clicked.connect(self._toggle_opacity)
+        self.opacity_btn.setProperty("persistent_active", self._transparent)
+        self.opacity_btn.set_active(self._transparent)
+        lay.addWidget(self.opacity_btn)
+
         self.search_btn = IconButton(
-            icon_path=os.path.join(self._btn_icons, "search.png"),
+            icon_path=os.path.join(self._btn_icons, "search_888888.png"),
+            hover_icon_path=os.path.join(self._btn_icons, "search_E0E0E0.png"),
             tooltip="Search (Ctrl+F)",
-            icon_size=16,
         )
         self.search_btn.clicked.connect(self._open_search)
         lay.addWidget(self.search_btn)
 
         self.pause_btn = IconButton(
-            icon_path=os.path.join(self._btn_icons, "pause.png"),
-            hover_icon_path=os.path.join(self._btn_icons, "pause_hover.png"),
+            icon_path=os.path.join(self._btn_icons, "pause_888888.png"),
+            hover_icon_path=os.path.join(self._btn_icons, "pause_E0E0E0.png"),
             tooltip="Pause (Ctrl+P)",
-            icon_size=16,
         )
         self.pause_btn.clicked.connect(self._toggle_pause)
         lay.addWidget(self.pause_btn)
 
         self.clear_btn = IconButton(
-            icon_path=os.path.join(self._btn_icons, "restart_idle.png"),
-            hover_icon_path=os.path.join(self._btn_icons, "restart_active.png"),
+            icon_path=os.path.join(self._btn_icons, "clear_888888.png"),
+            hover_icon_path=os.path.join(self._btn_icons, "clear_E0E0E0.png"),
             tooltip="Clear (Ctrl+L)",
         )
         self.clear_btn.clicked.connect(self._clear)
@@ -594,6 +602,12 @@ class LogViewerWindow(QMainWindow):
             self.search.edit.clear()
             self._rerender()
             self.text.setFocus()
+
+    def _toggle_opacity(self):
+        self._transparent = not self._transparent
+        self.setWindowOpacity(WINDOW_OPACITY if self._transparent else 1.0)
+        self.opacity_btn.setProperty("persistent_active", self._transparent)
+        self.opacity_btn.set_active(self._transparent)
 
     def _toggle_pause(self):
         self._paused = not self._paused
