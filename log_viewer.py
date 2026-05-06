@@ -35,40 +35,15 @@ from PySide6.QtWidgets import (
     QColorDialog,
 )
 
-from config.config import PATHS
+from config.config import LOG_SOURCES, HIGHLIGHT_PATTERNS
 
 # ╔══════════════════════════════════════════════════════════════════════╗
 # ║  CONFIG                                                              ║
 # ╚══════════════════════════════════════════════════════════════════════╝
 
-LOG_SOURCES = [
-    {
-        "label": "Email Bot",
-        "path": PATHS.EMAIL_BOT_LOG_PATH,
-        "label_color": "#8fd68a",
-        "text_color": "#cccccc",
-    },
-    {
-        "label": "K1 Financials",
-        "path": PATHS.FINANCIALS_LOG_PATH,
-        "label_color": "#5599ff",
-        "text_color": "#cccccc",
-    },
-    {
-        "label": "Scooper",
-        "path": PATHS.SCOOPER_LOG_PATH,
-        "label_color": "#ff6b6b",
-        "text_color": "#cccccc",
-    },
-]
-
 POLL_INTERVAL_MS = 500
 SEPARATOR = " │ "
 
-HIGHLIGHT_PATTERNS = [
-    (r"-{3,}.*Received message.*-{3,}", "#55ff55"),
-    (r"Routing as DECLINE", "#ff3333"),
-]
 _COMPILED_PATTERNS = [(re.compile(p), c) for p, c in HIGHLIGHT_PATTERNS]
 
 # Per-level full-row background tint. None = no tint.
