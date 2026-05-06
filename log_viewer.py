@@ -11,12 +11,28 @@ from collections import deque
 
 from PySide6.QtCore import Qt, QTimer, QSize, Signal
 from PySide6.QtGui import (
-    QColor, QFont, QIcon, QTextCharFormat, QTextCursor,
-    QShortcut, QKeySequence, QPixmap,
+    QColor,
+    QFont,
+    QIcon,
+    QTextBlockFormat,
+    QTextCharFormat,
+    QTextCursor,
+    QShortcut,
+    QKeySequence,
+    QPixmap,
 )
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QTextEdit, QFrame, QPushButton, QLineEdit, QColorDialog,
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QTextEdit,
+    QFrame,
+    QPushButton,
+    QLineEdit,
+    QColorDialog,
 )
 
 from config.config import PATHS
@@ -26,9 +42,24 @@ from config.config import PATHS
 # ╚══════════════════════════════════════════════════════════════════════╝
 
 LOG_SOURCES = [
-    {"label": "Email Bot",     "path": PATHS.EMAIL_BOT_LOG_PATH,  "label_color": "#8fd68a", "text_color": "#cccccc"},
-    {"label": "K1 Financials", "path": PATHS.FINANCIALS_LOG_PATH, "label_color": "#5599ff", "text_color": "#cccccc"},
-    {"label": "Scooper",       "path": PATHS.SCOOPER_LOG_PATH,    "label_color": "#ff6b6b", "text_color": "#cccccc"},
+    {
+        "label": "Email Bot",
+        "path": PATHS.EMAIL_BOT_LOG_PATH,
+        "label_color": "#8fd68a",
+        "text_color": "#cccccc",
+    },
+    {
+        "label": "K1 Financials",
+        "path": PATHS.FINANCIALS_LOG_PATH,
+        "label_color": "#5599ff",
+        "text_color": "#cccccc",
+    },
+    {
+        "label": "Scooper",
+        "path": PATHS.SCOOPER_LOG_PATH,
+        "label_color": "#ff6b6b",
+        "text_color": "#cccccc",
+    },
 ]
 
 POLL_INTERVAL_MS = 500
@@ -40,10 +71,19 @@ HIGHLIGHT_PATTERNS = [
 ]
 _COMPILED_PATTERNS = [(re.compile(p), c) for p, c in HIGHLIGHT_PATTERNS]
 
+# Per-level full-row background tint. None = no tint.
+LEVEL_BACKGROUNDS = {
+    "WARNING": "#80FFFF00",  # bright yellow @ 50% alpha (#AARRGGBB)
+    "ERROR": "#80FFFF00",
+}
+_LEVEL_RE = re.compile(r"\b(WARNING|ERROR|CRITICAL)\b")
+
 WINDOW_TITLE = "Log Viewer"
 WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 760
-WINDOW_OPACITY = 0.6  # opacity used when transparency is toggled ON (Ctrl+T). Startup is always 1.0.
+WINDOW_OPACITY = (
+    0.6  # opacity used when transparency is toggled ON (Ctrl+T). Startup is always 1.0.
+)
 
 # Palette
 BG = "#1a1a1c"
@@ -122,6 +162,7 @@ class LogTailer:
 
 class StatusCard(QFrame):
     """Clickable status card. Left-click toggles visibility, right-click changes color."""
+
     toggled = Signal(object)
     color_changed = Signal(object)  # emits self
 
@@ -176,9 +217,15 @@ class StatusCard(QFrame):
                 border-color: {ACCENT_DIM if self.enabled else BORDER};
             }}
         """)
-        self.dot.setStyleSheet(f"color: {dot_color}; background: transparent; border: none;")
-        self.label.setStyleSheet(f"color: {label_color}; background: transparent; border: none; {deco}")
-        self.name.setStyleSheet(f"color: {name_color}; background: transparent; border: none; {deco}")
+        self.dot.setStyleSheet(
+            f"color: {dot_color}; background: transparent; border: none;"
+        )
+        self.label.setStyleSheet(
+            f"color: {label_color}; background: transparent; border: none; {deco}"
+        )
+        self.name.setStyleSheet(
+            f"color: {name_color}; background: transparent; border: none; {deco}"
+        )
 
     def refresh_dot(self):
         if not self.enabled:
@@ -220,9 +267,14 @@ def _load_icon(path: str | None) -> QIcon | None:
 
 
 class IconButton(QPushButton):
-    def __init__(self, icon_path: str | None = None, hover_icon_path: str | None = None,
-                 glyph: str | None = None, tooltip: str = "",
-                 icon_size: int = CLEAR_ICON_SIZE):
+    def __init__(
+        self,
+        icon_path: str | None = None,
+        hover_icon_path: str | None = None,
+        glyph: str | None = None,
+        tooltip: str = "",
+        icon_size: int = CLEAR_ICON_SIZE,
+    ):
         super().__init__()
         self.setCursor(Qt.PointingHandCursor)
         self.setToolTip(tooltip)
@@ -304,8 +356,11 @@ class SearchBar(QFrame):
 
         icon = QLabel()
         if self._icon_path and os.path.exists(self._icon_path):
-            icon.setPixmap(QPixmap(self._icon_path).scaled(
-                14, 14, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            icon.setPixmap(
+                QPixmap(self._icon_path).scaled(
+                    14, 14, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                )
+            )
         else:
             icon.setText("🔎")
             icon.setFont(QFont(UI_FONT, 10))
@@ -380,8 +435,10 @@ class LogViewerWindow(QMainWindow):
             DWMWA_USE_IMMERSIVE_DARK_MODE = 20
             value = ctypes.c_int(1)
             ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
-                ctypes.byref(value), ctypes.sizeof(value),
+                hwnd,
+                DWMWA_USE_IMMERSIVE_DARK_MODE,
+                ctypes.byref(value),
+                ctypes.sizeof(value),
             )
         except Exception:
             pass
@@ -408,7 +465,9 @@ class LogViewerWindow(QMainWindow):
         root.addWidget(self._make_divider())
 
         # Search bar (hidden by default)
-        self.search = SearchBar(icon_path=os.path.join(self._btn_icons, "search_888888.png"))
+        self.search = SearchBar(
+            icon_path=os.path.join(self._btn_icons, "search_888888.png")
+        )
         self.search.changed.connect(self._on_filter_changed)
         self.search.closed.connect(self._close_search)
         root.addWidget(self.search)
@@ -488,8 +547,11 @@ class LogViewerWindow(QMainWindow):
         brand = QLabel()
         logo_path = os.path.join(self._os_icons, "logs.ico")
         if os.path.exists(logo_path):
-            brand.setPixmap(QPixmap(logo_path).scaled(
-                20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            brand.setPixmap(
+                QPixmap(logo_path).scaled(
+                    20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                )
+            )
         lay.addWidget(brand)
 
         wordmark = QLabel("Log Viewer")
@@ -613,7 +675,9 @@ class LogViewerWindow(QMainWindow):
         self._paused = not self._paused
         self.pause_btn.setProperty("persistent_active", self._paused)
         self.pause_btn.set_active(self._paused)
-        self.pause_btn.setToolTip("Resume (Ctrl+P)" if self._paused else "Pause (Ctrl+P)")
+        self.pause_btn.setToolTip(
+            "Resume (Ctrl+P)" if self._paused else "Pause (Ctrl+P)"
+        )
         self._update_status()
 
     def _clear(self):
@@ -641,11 +705,22 @@ class LogViewerWindow(QMainWindow):
                 text_color = color
                 break
 
+        level_match = _LEVEL_RE.search(line)
+        bg_color = LEVEL_BACKGROUNDS.get(level_match.group(1)) if level_match else None
+
         cursor = self.text.textCursor()
         cursor.movePosition(QTextCursor.End)
+        if cursor.position() > 0:
+            cursor.insertBlock()
+
+        block_fmt = QTextBlockFormat()
+        if bg_color:
+            block_fmt.setBackground(QColor(bg_color))
+        cursor.setBlockFormat(block_fmt)
+
         cursor.insertText(padded, self._fmt(source["label_color"], bold=True))
         cursor.insertText(SEPARATOR, self._fmt("#4a4a4f"))
-        cursor.insertText(line + "\n", self._fmt(text_color))
+        cursor.insertText(line, self._fmt(text_color))
 
         if self._auto_scroll:
             sb = self.text.verticalScrollBar()
@@ -684,7 +759,7 @@ class LogViewerWindow(QMainWindow):
 
         left = f"  {visible:,} visible  │  {total:,} buffered  │  {enabled}/{len(LOG_SOURCES)} sources"
         if self._filter_text:
-            left += f"  │  filter: \"{self._filter_text}\""
+            left += f'  │  filter: "{self._filter_text}"'
         self.status_left.setText(left)
 
         state = []
