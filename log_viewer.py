@@ -10,6 +10,7 @@ import ctypes
 from collections import deque
 
 from PySide6.QtCore import Qt, QTimer, QSize, Signal
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -33,6 +34,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QLineEdit,
     QColorDialog,
+    QSystemTrayIcon,
+    QMenu,
 )
 
 from config.config import LOG_SOURCES, HIGHLIGHT_PATTERNS
@@ -380,7 +383,7 @@ class LogViewerWindow(QMainWindow):
 
         self._auto_scroll = True
         self._paused = False
-        self._transparent = False
+        self._ghost_mode = False
         self._filter_text = ""
         self._suppress_scroll_update = False
         self._max_label = max(len(s["label"]) for s in LOG_SOURCES)
@@ -390,6 +393,7 @@ class LogViewerWindow(QMainWindow):
         self._build_ui()
         self._wire_shortcuts()
         self._apply_dark_titlebar()
+        self._build_tray()
 
         self.tailers = [LogTailer(src) for src in LOG_SOURCES]
 
@@ -418,12 +422,110 @@ class LogViewerWindow(QMainWindow):
         except Exception:
             pass
 
+    def _build_tray(self):
+        icon = QIcon(os.path.join(self._os_icons, "logs.ico"))
+        self.tray = QSystemTrayIcon(icon, self)
+        self.tray.setToolTip(WINDOW_TITLE)
+
+        menu = QMenu()
+        self._tray_toggle_window = menu.addAction("Hide window")
+        self._tray_toggle_window.triggered.connect(self._tray_toggle_visibility)
+
+        self._tray_ghost = menu.addAction("Ghost mode")
+        self._tray_ghost.setCheckable(True)
+        self._tray_ghost.triggered.connect(self._toggle_ghost_mode)
+
+        menu.addSeparator()
+        quit_action = menu.addAction("Quit")
+        quit_action.triggered.connect(QApplication.instance().quit)
+
+        self.tray.setContextMenu(menu)
+        self.tray.activated.connect(self._on_tray_activated)
+        self.tray.show()
+
+    def _on_tray_activated(self, reason):
+        if reason == QSystemTrayIcon.DoubleClick:
+            self._show_and_raise()
+
+    def _tray_toggle_visibility(self):
+        if self.isVisible():
+            self.hide()
+            self._tray_toggle_window.setText("Show window")
+        else:
+            self._show_and_raise()
+
+    def _show_and_raise(self):
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        self._tray_toggle_window.setText("Hide window")
+
+    def _toggle_ghost_mode(self):
+        self._ghost_mode = not self._ghost_mode
+        self._apply_ghost_mode()
+
+    def _apply_ghost_mode(self):
+        on = self._ghost_mode
+
+        # Opacity — no flash, plain Qt call.
+        self.setWindowOpacity(WINDOW_OPACITY if on else 1.0)
+
+        # Click-through + always-on-top via Win32, avoiding Qt's flag-driven re-show.
+        try:
+            GWL_EXSTYLE = -20
+            WS_EX_TRANSPARENT = 0x00000020
+            WS_EX_LAYERED = 0x00080000
+            HWND_TOPMOST = ctypes.c_void_p(-1)
+            HWND_NOTOPMOST = ctypes.c_void_p(-2)
+            SWP_NOMOVE = 0x0002
+            SWP_NOSIZE = 0x0001
+            SWP_NOACTIVATE = 0x0010
+            SWP_SHOWWINDOW = 0x0040
+
+            hwnd = ctypes.c_void_p(int(self.winId()))
+            user32 = ctypes.windll.user32
+
+            user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
+            user32.GetWindowLongPtrW.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            user32.SetWindowLongPtrW.restype = ctypes.c_ssize_t
+            user32.SetWindowLongPtrW.argtypes = [
+                ctypes.c_void_p, ctypes.c_int, ctypes.c_ssize_t,
+            ]
+            user32.SetWindowPos.restype = ctypes.c_bool
+            user32.SetWindowPos.argtypes = [
+                ctypes.c_void_p, ctypes.c_void_p,
+                ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                ctypes.c_uint,
+            ]
+
+            style = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
+            # WS_EX_LAYERED is required for WS_EX_TRANSPARENT to take effect.
+            new_style = style | WS_EX_LAYERED
+            if on:
+                new_style |= WS_EX_TRANSPARENT
+            else:
+                new_style &= ~WS_EX_TRANSPARENT
+            user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_style)
+
+            user32.SetWindowPos(
+                hwnd,
+                HWND_TOPMOST if on else HWND_NOTOPMOST,
+                0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+            )
+        except Exception:
+            pass
+
+        self._tray_ghost.setChecked(on)
+        self.opacity_btn.setProperty("persistent_active", on)
+        self.opacity_btn.set_active(on)
+
     def _wire_shortcuts(self):
         QShortcut(QKeySequence("Ctrl+L"), self, activated=self._clear)
         QShortcut(QKeySequence("Ctrl+F"), self, activated=self._open_search)
         QShortcut(QKeySequence("Escape"), self, activated=self._close_search)
         QShortcut(QKeySequence("Ctrl+P"), self, activated=self._toggle_pause)
-        QShortcut(QKeySequence("Ctrl+T"), self, activated=self._toggle_opacity)
+        QShortcut(QKeySequence("Ctrl+T"), self, activated=self._toggle_ghost_mode)
 
     # ── UI construction ────────────────────────────────────────────
 
@@ -549,11 +651,11 @@ class LogViewerWindow(QMainWindow):
         self.opacity_btn = IconButton(
             icon_path=os.path.join(self._btn_icons, "opacity_888888.png"),
             hover_icon_path=os.path.join(self._btn_icons, "opacity_E0E0E0.png"),
-            tooltip="Toggle transparency (Ctrl+T)",
+            tooltip="Toggle ghost mode (Ctrl+T)",
         )
-        self.opacity_btn.clicked.connect(self._toggle_opacity)
-        self.opacity_btn.setProperty("persistent_active", self._transparent)
-        self.opacity_btn.set_active(self._transparent)
+        self.opacity_btn.clicked.connect(self._toggle_ghost_mode)
+        self.opacity_btn.setProperty("persistent_active", self._ghost_mode)
+        self.opacity_btn.set_active(self._ghost_mode)
         lay.addWidget(self.opacity_btn)
 
         self.search_btn = IconButton(
@@ -639,12 +741,6 @@ class LogViewerWindow(QMainWindow):
             self.search.edit.clear()
             self._rerender()
             self.text.setFocus()
-
-    def _toggle_opacity(self):
-        self._transparent = not self._transparent
-        self.setWindowOpacity(WINDOW_OPACITY if self._transparent else 1.0)
-        self.opacity_btn.setProperty("persistent_active", self._transparent)
-        self.opacity_btn.set_active(self._transparent)
 
     def _toggle_pause(self):
         self._paused = not self._paused
@@ -765,14 +861,109 @@ class LogViewerWindow(QMainWindow):
         self._update_status()
 
 
+IPC_SERVER_NAME = "LogViewerIPC_v1"
+IPC_MSG_TOGGLE_CLICK_THROUGH = b"TOGGLE_CLICK_THROUGH"
+CLI_ARG_TOGGLE = "--toggle-click-through"
+
+
+def _send_ipc_and_exit_if_running(message: bytes) -> bool:
+    """Returns True if another instance was running and we forwarded the message."""
+    sock = QLocalSocket()
+    sock.connectToServer(IPC_SERVER_NAME)
+    if not sock.waitForConnected(500):
+        return False
+    sock.write(message)
+    sock.flush()
+    sock.waitForBytesWritten(500)
+    sock.disconnectFromServer()
+    return True
+
+
+def _register_jump_list():
+    """Add a 'Toggle Ghost Mode' task to the taskbar right-click menu."""
+    try:
+        import pythoncom
+        from win32com.shell import shell  # type: ignore[import-not-found]
+        from win32com.propsys import propsys, pscon  # type: ignore[import-not-found]
+    except ImportError:
+        return
+
+    try:
+        cdl = pythoncom.CoCreateInstance(
+            shell.CLSID_DestinationList,
+            None,
+            pythoncom.CLSCTX_INPROC_SERVER,
+            shell.IID_ICustomDestinationList,
+        )
+        _, _ = cdl.BeginList()
+
+        link = pythoncom.CoCreateInstance(
+            shell.CLSID_ShellLink,
+            None,
+            pythoncom.CLSCTX_INPROC_SERVER,
+            shell.IID_IShellLink,
+        )
+        link.SetPath(sys.executable)
+        link.SetArguments(CLI_ARG_TOGGLE)
+        link.SetIconLocation(sys.executable, 0)
+
+        store = link.QueryInterface(propsys.IID_IPropertyStore)
+        store.SetValue(
+            pscon.PKEY_Title,
+            propsys.PROPVARIANTType("Toggle Ghost Mode"),
+        )
+        store.Commit()
+
+        tasks = pythoncom.CoCreateInstance(
+            shell.CLSID_EnumerableObjectCollection,
+            None,
+            pythoncom.CLSCTX_INPROC_SERVER,
+            shell.IID_IObjectCollection,
+        )
+        tasks.AddObject(link)
+        cdl.AddUserTasks(tasks)
+        cdl.CommitList()
+    except Exception:
+        # Jump list is non-critical — fail silently.
+        pass
+
+
 def main():
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(2)
     except Exception:
         pass
+
+    if CLI_ARG_TOGGLE in sys.argv[1:]:
+        if _send_ipc_and_exit_if_running(IPC_MSG_TOGGLE_CLICK_THROUGH):
+            return
+        # No instance running — fall through and start one normally.
+
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     win = LogViewerWindow()
+
+    server = QLocalServer()
+    # Clean up any stale socket file from a prior crash.
+    QLocalServer.removeServer(IPC_SERVER_NAME)
+    server.listen(IPC_SERVER_NAME)
+
+    def _on_new_connection():
+        sock = server.nextPendingConnection()
+        if sock is None:
+            return
+
+        def _on_ready():
+            data = bytes(sock.readAll())
+            if IPC_MSG_TOGGLE_CLICK_THROUGH in data:
+                win._toggle_ghost_mode()
+            sock.disconnectFromServer()
+
+        sock.readyRead.connect(_on_ready)
+
+    server.newConnection.connect(_on_new_connection)
+
+    _register_jump_list()
     win.show()
     sys.exit(app.exec())
 
