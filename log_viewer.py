@@ -38,7 +38,7 @@ from PySide6.QtWidgets import (
     QMenu,
 )
 
-from config.config import LOG_SOURCES, HIGHLIGHT_PATTERNS
+from config.config import IPC_SERVER_NAME, LOG_SOURCES, HIGHLIGHT_PATTERNS
 
 # ╔══════════════════════════════════════════════════════════════════════╗
 # ║  CONFIG                                                              ║
@@ -861,7 +861,6 @@ class LogViewerWindow(QMainWindow):
         self._update_status()
 
 
-IPC_SERVER_NAME = "LogViewerIPC_v1"
 IPC_MSG_TOGGLE_CLICK_THROUGH = b"TOGGLE_CLICK_THROUGH"
 CLI_ARG_TOGGLE = "--toggle-click-through"
 
