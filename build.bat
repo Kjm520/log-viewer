@@ -9,4 +9,3 @@ echo Building exe...
 pyinstaller LogViewer.spec
 
 echo Done! Exe is at dist\LogViewer.exe
-pause

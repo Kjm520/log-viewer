@@ -1,1 +1,1 @@
-Various RPA logging's log consolidator
+Multi-source log consolidator
